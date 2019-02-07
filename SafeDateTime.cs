@@ -7,25 +7,32 @@ using UnityEngine;
 public static class SafeDateTime
 {
     /// <summary>
-    /// NtpServer Time Offset
+    /// NtpServer Default Time Offset
     /// </summary>
     readonly static DateTime timeOffset = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     /// <summary>
     /// Default olarak telefonun zamanını kullanıyoruz (internet olmazsa vs durumlar için)
+    /// defaultly use device time (if there is no internet)
     /// </summary>
     static DateTime ServerTime = DateTime.UtcNow;
 
     /// <summary>
-    /// Oyunun orta yerinde Senkronize edilirse, bu zamana kadar geçen süreyi çıkarmak için
+    /// Oyunun orta yerinde Senkronize edilirse, bu zamana kadar Unityde geçen süreyi çıkarmak için
+    /// if sync in runtime, we substract passed unity time
     /// </summary>
     static float AlreadyPassedUnityTime;
 
     /// <summary>
     /// Sunucudan başarılı şekilde zamanı aldıysa True olur
+    /// Received Time Succesfully
     /// </summary>
     public static bool Synched { get; private set; }
 
+    /// <summary>
+    /// HILE KORUMALI SU AN ki ZAMAN
+    /// CHEAT PROTECTED UTC NOW
+    /// </summary>
     public static DateTime UtcNow
     {
         get
@@ -34,41 +41,26 @@ public static class SafeDateTime
                 Sync();
             return ServerTime + 
                 TimeSpan.FromSeconds(Time.realtimeSinceStartup - AlreadyPassedUnityTime) + 
-                Difference; // Zaman gösterimlerimlerinde standart DateTime ile aynı zamanı göstermesi için
+                Difference; // Zaman gösterimlerimlerinde standart DateTime ile aynı değeri göstermesi için
+                            // To avoid time jump
         }
     }
 
     /// <summary>
     /// Sunucu ile Aygıt arasındaki zaman farkı
+    /// Time Difference Between Server and Device
     /// </summary>
     public static TimeSpan Difference { get; private set; }
 
-    /*private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.T))
-            Debug.Log(Time.unscaledTime + "\n" + Time.realtimeSinceStartup + "\n" + DateTime.UtcNow + "\n");
-        if (Input.GetKeyDown(KeyCode.Y))
-            Debug.Log(Time.time + " : " + Time.fixedTime);
-        if (Input.GetKeyDown(KeyCode.U))
-            Debug.Log(DDateTime.UtcNow);
-    }*/
-
     public static void Sync()
     {
-        /*API.Manager.GetConfiguration().Then((resp) =>
-        {
-            if (resp.Success)
-            {
-            }
-        });*/
         double mSec = 0;
         if(NtpTime(out mSec))
         {
             /*Debug.Log(mSec);
-            Debug.Log( DateTime.MinValue );
-            Debug.Log(LocalTime());
+            Debug.Log( LocalTime());
             Debug.Log( TimeSpan.FromMilliseconds(mSec));*/
-            ServerTime = timeOffset + TimeSpan.FromMilliseconds(mSec);//resp.Seconds gibi bişey olacak
+            ServerTime = timeOffset + TimeSpan.FromMilliseconds(mSec);
             Difference = DateTime.UtcNow - ServerTime;
             Synched = true;
             AlreadyPassedUnityTime = Time.unscaledTime;
@@ -76,6 +68,14 @@ public static class SafeDateTime
         }
         else
             Debug.LogError("Time Synched Failed !!!");
+    }
+    public static void SyncManuel(DateTime now)
+    {
+        ServerTime = now;
+        Difference = DateTime.UtcNow - ServerTime;
+        Synched = true;
+        AlreadyPassedUnityTime = Time.unscaledTime;
+        Debug.Log("Time Synched(Manuely): Difference > " + Difference);
     }
 
     public static bool IsCheating(float AcceptableTimeDifference = 36000)
@@ -108,8 +108,8 @@ public static class SafeDateTime
             ulong intc = (ulong)ntpData[40] << 24 | (ulong)ntpData[41] << 16 | (ulong)ntpData[42] << 8 | (ulong)ntpData[43];
             ulong frac = (ulong)ntpData[44] << 24 | (ulong)ntpData[45] << 16 | (ulong)ntpData[46] << 8 | (ulong)ntpData[47];
 
-            Debug.Log("NTP time " + intc + " " + frac);
             milliSeconds = (double)((intc * 1000) + ((frac * 1000) / 0x100000000L));
+            //Debug.Log("NTP time " + milliSeconds);
             return true;
         }
         catch (Exception exception)
@@ -123,6 +123,6 @@ public static class SafeDateTime
 
     static double LocalTime()
     {
-        return DateTime.UtcNow.Subtract(new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
+        return DateTime.UtcNow.Subtract(timeOffset).TotalMilliseconds;
     }
 }
